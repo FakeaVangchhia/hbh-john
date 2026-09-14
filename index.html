@@ -1,0 +1,890 @@
+<title>Vøid // John Lalremruata</title>
+<meta name="description" content="Security operator console — the portfolio of John Lalremruata, cybersecurity & red team." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" />
+
+<style>
+  /* ---- Single-world neon terminal. Deliberately one theme; every colour is
+     painted explicitly so it holds on any host ground. ---- */
+  :root {
+    --bg: #070b10;
+    --bg-2: #0b121a;
+    --bg-3: #0f1a25;
+    --panel: #0c141dcc;
+    --border: #1b2c3b;
+    --border-lit: #294055;
+    --text: #cdd9e5;
+    --text-dim: #7690a6;
+    --text-faint: #4a5f73;
+    --green: #34f5a0;
+    --green-deep: #14b877;
+    --amber: #ffb64d;
+    --cyan: #46d8ff;
+    --magenta: #ff5db1;
+    --red: #ff6b6b;
+    --glow-green: 0 0 18px rgba(52, 245, 160, 0.35);
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+    --display: "Chakra Petch", "Segoe UI", sans-serif;
+    --body: "IBM Plex Sans", system-ui, sans-serif;
+    --maxw: 1120px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body);
+    line-height: 1.6;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Ambient layers: matrix canvas, scanlines, vignette, grid. All behind. */
+  #matrix {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.16;
+    pointer-events: none;
+  }
+  .fx-grid, .fx-scan, .fx-vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .fx-grid {
+    background-image:
+      linear-gradient(rgba(52, 245, 160, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(52, 245, 160, 0.045) 1px, transparent 1px);
+    background-size: 46px 46px;
+    mask-image: radial-gradient(circle at 50% 30%, #000 5%, transparent 75%);
+  }
+  .fx-scan {
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.16) 3px,
+      rgba(0, 0, 0, 0) 4px
+    );
+    opacity: 0.5;
+  }
+  .fx-vignette {
+    background: radial-gradient(120% 90% at 50% 0%, transparent 55%, rgba(0,0,0,0.6) 100%);
+  }
+
+  .shell {
+    position: relative;
+    z-index: 2;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding-inline: 20px;
+  }
+
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible {
+    outline: 2px solid var(--green);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  ::selection { background: rgba(52, 245, 160, 0.28); color: #fff; }
+
+  /* ---------------- Birthday alert bar ---------------- */
+  .alert {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 9px 16px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    letter-spacing: 0.04em;
+    color: #1a1204;
+    background: linear-gradient(90deg, var(--amber), #ffd48a, var(--amber));
+    background-size: 200% 100%;
+    animation: slideBg 8s linear infinite;
+  }
+  .alert b { font-weight: 700; }
+  .alert .tag {
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 3px;
+    background: #1a1204;
+    color: var(--amber);
+  }
+  @keyframes slideBg { to { background-position: 200% 0; } }
+
+  /* ---------------- Top nav ---------------- */
+  header.nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    backdrop-filter: blur(10px);
+    background: rgba(7, 11, 16, 0.72);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-in {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--display);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    font-size: 18px;
+    color: var(--text);
+  }
+  .brand .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: var(--glow-green);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .brand span { color: var(--green); }
+  nav.links { display: flex; gap: 6px; font-family: var(--mono); font-size: 13px; }
+  nav.links a {
+    color: var(--text-dim);
+    padding: 7px 12px;
+    border-radius: 6px;
+    transition: color .18s, background .18s;
+  }
+  nav.links a:hover { color: var(--green); background: rgba(52,245,160,0.07); text-decoration: none; }
+  .nav-toggle { display: none; }
+
+  /* ---------------- Terminal window (shared chrome) ---------------- */
+  .win {
+    border: 1px solid var(--border-lit);
+    border-radius: 12px;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.03);
+    overflow: hidden;
+  }
+  .win-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    background: var(--bg-3);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .win-bar .btns { display: flex; gap: 7px; }
+  .win-bar .btns i {
+    width: 12px; height: 12px; border-radius: 50%; display: block;
+  }
+  .b-r { background: #ff5f57; } .b-y { background: #febc2e; } .b-g { background: #28c840; }
+  .win-bar .title { margin-left: 6px; }
+  .win-bar .title b { color: var(--text-dim); font-weight: 500; }
+
+  /* ---------------- Hero ---------------- */
+  .hero { padding-block: 46px 30px; }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 0.9fr;
+    gap: 26px;
+    align-items: start;
+  }
+  .term-body {
+    padding: 20px 22px 22px;
+    font-family: var(--mono);
+    font-size: 14px;
+    min-height: 340px;
+  }
+  .line { white-space: pre-wrap; word-break: break-word; margin: 0 0 3px; }
+  .muted { color: var(--text-dim); }
+  .g { color: var(--green); }
+  .a { color: var(--amber); }
+  .c { color: var(--cyan); }
+  .m { color: var(--magenta); }
+  .prompt .u { color: var(--green); }
+  .prompt .p { color: var(--cyan); }
+  .prompt .s { color: var(--text-faint); }
+
+  .banner {
+    color: var(--green);
+    text-shadow: var(--glow-green);
+    font-size: 12px;
+    line-height: 1.15;
+    margin: 0 0 10px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  h1.name {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(30px, 6vw, 52px);
+    line-height: 1.02;
+    letter-spacing: 0.01em;
+    margin: 4px 0 6px;
+    color: #eaf4ff;
+    text-wrap: balance;
+  }
+  h1.name em { font-style: normal; color: var(--green); text-shadow: var(--glow-green); }
+  .role {
+    font-family: var(--mono);
+    color: var(--amber);
+    font-size: 15px;
+    margin: 0 0 14px;
+    min-height: 22px;
+  }
+  .cursor {
+    display: inline-block;
+    width: 9px; height: 1.05em;
+    background: var(--green);
+    margin-left: 2px;
+    vertical-align: -2px;
+    animation: blink 1s steps(1) infinite;
+    box-shadow: var(--glow-green);
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* interactive command input */
+  .cmd-row { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+  .cmd-row label { color: var(--green); font-family: var(--mono); font-size: 14px; }
+  .cmd-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    caret-color: var(--green);
+  }
+  .cmd-input:focus { outline: none; }
+  .hint { color: var(--text-faint); font-size: 12px; margin-top: 12px; }
+  .hint b { color: var(--cyan); font-weight: 500; }
+
+  /* ID card */
+  .idcard { display: grid; gap: 14px; }
+  .avatar {
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    background:
+      radial-gradient(120% 120% at 30% 20%, rgba(52,245,160,0.16), transparent 60%),
+      linear-gradient(160deg, var(--bg-3), var(--bg));
+    border: 1px solid var(--border-lit);
+    display: grid;
+    place-items: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .avatar .glyph {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(64px, 14vw, 120px);
+    color: var(--green);
+    text-shadow: 0 0 30px rgba(52,245,160,0.5);
+    letter-spacing: -0.02em;
+  }
+  .avatar .ring {
+    position: absolute; inset: 14px;
+    border: 1px dashed rgba(52,245,160,0.28);
+    border-radius: 10px;
+    animation: spin 26s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .id-rows { font-family: var(--mono); font-size: 12.5px; display: grid; gap: 7px; }
+  .id-rows .r { display: flex; justify-content: space-between; gap: 10px; }
+  .id-rows .k { color: var(--text-faint); }
+  .id-rows .v { color: var(--text); text-align: right; }
+  .status-ok { color: var(--green); }
+
+  /* ---------------- Sections ---------------- */
+  section { padding-block: 40px; }
+  .sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .sec-head .cmd {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .sec-head .cmd .g { color: var(--green); }
+  .sec-head .rule { flex: 1; height: 1px; background: linear-gradient(90deg, var(--border-lit), transparent); }
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(22px, 3.4vw, 30px);
+    margin: 0;
+    color: #eaf4ff;
+    letter-spacing: 0.01em;
+  }
+
+  .two-col { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 22px; align-items: start; }
+  .prose p { color: var(--text-dim); margin: 0 0 14px; max-width: 62ch; }
+  .prose strong { color: var(--text); font-weight: 600; }
+  .prose .term-tag { color: var(--green); font-family: var(--mono); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .stat {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    background: var(--panel);
+  }
+  .stat .n { font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--green); }
+  .stat .l { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); letter-spacing: 0.03em; }
+
+  /* arsenal */
+  .arsenal { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .tool {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 13px;
+    background: var(--panel);
+    font-family: var(--mono);
+    font-size: 13px;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .tool:hover { border-color: var(--green-deep); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.4); }
+  .tool .k { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: var(--glow-green); flex: none; }
+
+  /* focus / capability cards */
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s, transform .2s;
+  }
+  .card:hover { border-color: var(--border-lit); transform: translateY(-3px); }
+  .card::before {
+    content: "";
+    position: absolute; inset: 0 0 auto 0; height: 2px;
+    background: linear-gradient(90deg, var(--green), transparent);
+    opacity: 0.7;
+  }
+  .card .ic { font-family: var(--mono); font-size: 13px; color: var(--green); margin-bottom: 12px; }
+  .card h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 8px; color: #eaf4ff; }
+  .card p { color: var(--text-dim); font-size: 14px; margin: 0; }
+
+  /* ops / projects */
+  .ops { display: grid; gap: 14px; }
+  .op {
+    display: grid;
+    grid-template-columns: 54px 1fr auto;
+    gap: 18px;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    background: var(--panel);
+    transition: border-color .2s, background .2s;
+  }
+  .op:hover { border-color: var(--border-lit); background: var(--bg-2); }
+  .op .idx { font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--text-faint); }
+  .op h3 { font-family: var(--display); font-weight: 600; font-size: 18px; margin: 0 0 4px; color: #eaf4ff; }
+  .op p { margin: 0; color: var(--text-dim); font-size: 13.5px; }
+  .op .stack { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .op .badge {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.05em;
+    color: var(--amber); border: 1px solid rgba(255,182,77,0.4);
+    padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  }
+
+  /* contact */
+  .contact-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 22px; align-items: stretch; }
+  .contact-links { display: grid; gap: 12px; align-content: start; }
+  .clink {
+    display: flex; align-items: center; gap: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 15px 18px;
+    background: var(--panel);
+    font-family: var(--mono);
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+  }
+  .clink:hover { border-color: var(--green-deep); transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,0.4); text-decoration: none; }
+  .clink .ico { width: 20px; text-align: center; color: var(--green); font-weight: 700; }
+  .clink .lbl { color: var(--text-faint); font-size: 11px; letter-spacing: 0.05em; }
+  .clink .val { color: var(--text); font-size: 14px; }
+  .clink .go { margin-left: auto; color: var(--text-faint); }
+
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--mono); font-weight: 700; font-size: 14px;
+    color: #04150d;
+    background: linear-gradient(180deg, #5affb0, var(--green));
+    padding: 13px 22px; border-radius: 10px;
+    border: none; cursor: pointer;
+    box-shadow: 0 8px 24px rgba(52,245,160,0.28);
+    transition: transform .18s, box-shadow .18s;
+  }
+  .cta:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(52,245,160,0.42); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    margin-top: 30px;
+    padding-block: 26px 40px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-faint);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  footer .g { color: var(--green); }
+
+  /* confetti canvas */
+  #confetti { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+
+  @media (max-width: 860px) {
+    .hero-grid, .two-col, .contact-grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: 1fr; }
+    nav.links { display: none; }
+    nav.links.open {
+      display: flex; position: absolute; top: 60px; right: 20px; left: 20px;
+      flex-direction: column; background: var(--bg-2);
+      border: 1px solid var(--border); border-radius: 10px; padding: 8px;
+    }
+    .nav-toggle {
+      display: inline-flex; background: transparent; border: 1px solid var(--border);
+      color: var(--green); font-family: var(--mono); border-radius: 8px;
+      padding: 8px 12px; cursor: pointer;
+    }
+    .op { grid-template-columns: 1fr; gap: 8px; }
+    .op .badge { justify-self: start; }
+    .idcard { order: -1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #matrix { display: none; }
+    .alert, .brand .dot, .avatar .ring, .cursor { animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+
+<canvas id="matrix" aria-hidden="true"></canvas>
+<div class="fx-grid" aria-hidden="true"></div>
+<div class="fx-scan" aria-hidden="true"></div>
+<div class="fx-vignette" aria-hidden="true"></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+
+<div class="alert" id="bday-alert" role="status">
+  <span class="tag">SYS_ALERT</span>
+  <span><b>Happy Birthday, John!</b> — a payload of good wishes has been deployed to your day. 🎂</span>
+</div>
+
+<header class="nav">
+  <div class="shell nav-in">
+    <div class="brand"><span class="dot" aria-hidden="true"></span>john<span>@</span>void<span>:~$</span></div>
+    <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navlinks">menu</button>
+    <nav class="links" id="navlinks" aria-label="Primary">
+      <a href="#whoami">./whoami</a>
+      <a href="#arsenal">./arsenal</a>
+      <a href="#focus">./focus</a>
+      <a href="#ops">./ops</a>
+      <a href="#contact">./contact</a>
+    </nav>
+  </div>
+</header>
+
+<main class="shell">
+  <!-- ---------------- HERO ---------------- -->
+  <section class="hero" id="top">
+    <div class="hero-grid">
+      <div class="win" aria-label="Interactive terminal">
+        <div class="win-bar">
+          <span class="btns"><i class="b-r"></i><i class="b-y"></i><i class="b-g"></i></span>
+          <span class="title"><b>zsh — john@void — 80×24</b></span>
+        </div>
+        <div class="term-body" id="term">
+          <pre class="banner" aria-hidden="true">
+ ██╗   ██╗ ██████╗ ██╗██████╗
+ ██║   ██║██╔═══██╗██║██╔══██╗
+ ██║   ██║██║   ██║██║██║  ██║
+ ╚██╗ ██╔╝██║   ██║██║██║  ██║
+  ╚████╔╝ ╚██████╔╝██║██████╔╝
+   ╚═══╝   ╚═════╝ ╚═╝╚═════╝ </pre>
+          <p class="line muted">// booting operator profile…</p>
+          <p class="line"><span class="prompt"><span class="u">john</span><span class="s">@</span><span class="p">void</span><span class="s">:~$</span></span> whoami</p>
+          <h1 class="name">John <em>Lalremruata</em></h1>
+          <p class="role" id="role">Cybersecurity &amp; Red Team Operator</p>
+          <p class="line muted" id="tagline">Breaking things on purpose so they hold up when it counts — plus a bit of digital creating on the side.</p>
+
+          <div id="scrollback" aria-live="polite"></div>
+
+          <div class="cmd-row">
+            <label for="cmd" aria-label="terminal prompt">john@void:~$</label>
+            <input class="cmd-input" id="cmd" autocomplete="off" spellcheck="false"
+                   aria-label="Type a command" placeholder="type 'help' and hit enter…" />
+            <span class="cursor" aria-hidden="true"></span>
+          </div>
+          <p class="hint">try: <b>help</b> · <b>skills</b> · <b>ops</b> · <b>contact</b> · <b>birthday</b> · <b>clear</b></p>
+        </div>
+      </div>
+
+      <aside class="idcard">
+        <div class="avatar" role="img" aria-label="Vøid operator sigil">
+          <span class="ring" aria-hidden="true"></span>
+          <span class="glyph">V</span>
+        </div>
+        <div class="win">
+          <div class="win-bar"><span class="title"><b>id --operator</b></span></div>
+          <div class="id-rows" style="padding:16px 18px;">
+            <div class="r"><span class="k">handle</span><span class="v c">@john_valinsky</span></div>
+            <div class="r"><span class="k">alias</span><span class="v m">Vøid</span></div>
+            <div class="r"><span class="k">role</span><span class="v">Cybersecurity</span></div>
+            <div class="r"><span class="k">specialty</span><span class="v">Red Team · Pentest</span></div>
+            <div class="r"><span class="k">os</span><span class="v g">Kali Linux</span></div>
+            <div class="r"><span class="k">status</span><span class="v status-ok">● available</span></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ---------------- WHOAMI ---------------- -->
+  <section id="whoami">
+    <div class="sec-head">
+      <span class="cmd"><span class="g">$</span> cat about.md</span>
+      <span class="rule"></span>
+    </div>
+    <div class="two-col">
+      <div class="prose">
+        <h2>Operator, not spectator.</h2>
+        <p style="margin-top:14px;">John — better known online as <strong>Vøid</strong> — works the offensive side of security. The mindset is simple: to defend a system you have to understand exactly how it breaks, so he spends his time thinking like an attacker and reporting back like an ally.</p>
+        <p>Day to day that means <strong>red-team simulations</strong>, <strong>penetration testing</strong>, and living in a <span class="term-tag">Kali</span> shell with the usual suspects — recon, exploitation, and clean, actionable write-ups. When the tools don't exist yet, he builds them and ships them to <span class="term-tag">GitHub</span>.</p>
+        <p>Off the clock he's a <strong>digital creator</strong>, turning what he learns into short, sharp content that makes security feel a lot less intimidating.</p>
+      </div>
+      <div class="stat-grid" aria-label="Snapshot">
+        <div class="stat"><div class="n">Red Team</div><div class="l">// primary discipline</div></div>
+        <div class="stat"><div class="n">Kali</div><div class="l">// daily driver</div></div>
+        <div class="stat"><div class="n">Offensive</div><div class="l">// security focus</div></div>
+        <div class="stat"><div class="n">Creator</div><div class="l">// content &amp; tooling</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- ARSENAL ---------------- -->
+  <section id="arsenal">
+    <div class="sec-head">
+      <span class="cmd"><span class="g">$</span> ls ~/arsenal</span>
+      <span class="rule"></span>
+    </div>
+    <h2 style="margin-bottom:20px;">The Arsenal</h2>
+    <div class="arsenal" id="arsenal-grid"></div>
+  </section>
+
+  <!-- ---------------- FOCUS ---------------- -->
+  <section id="focus">
+    <div class="sec-head">
+      <span class="cmd"><span class="g">$</span> ./services --list</span>
+      <span class="rule"></span>
+    </div>
+    <h2 style="margin-bottom:20px;">What Vøid Does</h2>
+    <div class="cards">
+      <div class="card">
+        <div class="ic">[ 01 ] red_team</div>
+        <h3>Red Team Simulation</h3>
+        <p>Full-scope adversary emulation — recon, initial access, privilege escalation and lateral movement — mapped to real attacker playbooks, then handed over as fixes, not fear.</p>
+      </div>
+      <div class="card">
+        <div class="ic">[ 02 ] pentest</div>
+        <h3>Penetration Testing</h3>
+        <p>Web apps, networks and endpoints probed against OWASP-style methodology. Every finding comes with proof, severity and a clear path to remediation.</p>
+      </div>
+      <div class="card">
+        <div class="ic">[ 03 ] create</div>
+        <h3>Security Tooling &amp; Content</h3>
+        <p>Custom scripts and tools that fill the gaps between off-the-shelf software — plus digital content that translates deep security into something anyone can follow.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- OPS ---------------- -->
+  <section id="ops">
+    <div class="sec-head">
+      <span class="cmd"><span class="g">$</span> git log --oneline ~/ops</span>
+      <span class="rule"></span>
+    </div>
+    <h2 style="margin-bottom:6px;">Selected Operations</h2>
+    <p class="muted" style="font-family:var(--mono); font-size:12.5px; margin:0 0 20px;">// sample engagements — swap in real case studies when ready</p>
+    <div class="ops">
+      <div class="op">
+        <div class="idx">01</div>
+        <div>
+          <h3>Web App Assault Simulation</h3>
+          <p>End-to-end pentest of a production web application: auth bypass hunting, injection testing and session analysis, delivered as a prioritised remediation report.</p>
+          <div class="stack"><span class="chip">Burp Suite</span><span class="chip">OWASP</span><span class="chip">Python</span></div>
+        </div>
+        <span class="badge">ENGAGEMENT</span>
+      </div>
+      <div class="op">
+        <div class="idx">02</div>
+        <div>
+          <h3>Internal Red Team Exercise</h3>
+          <p>Adversary emulation across an internal network — from foothold to domain-wide visibility — documenting each step so blue team could reproduce and close it.</p>
+          <div class="stack"><span class="chip">Kali</span><span class="chip">Metasploit</span><span class="chip">Bash</span></div>
+        </div>
+        <span class="badge">RED TEAM</span>
+      </div>
+      <div class="op">
+        <div class="idx">03</div>
+        <div>
+          <h3>Recon &amp; Automation Toolkit</h3>
+          <p>A homegrown set of scripts that automate reconnaissance and reporting, published open-source so the wider community can build on it.</p>
+          <div class="stack"><span class="chip">Python</span><span class="chip">GitHub</span><span class="chip">Automation</span></div>
+        </div>
+        <span class="badge">OPEN SOURCE</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ---------------- CONTACT ---------------- -->
+  <section id="contact">
+    <div class="sec-head">
+      <span class="cmd"><span class="g">$</span> ./connect --open</span>
+      <span class="rule"></span>
+    </div>
+    <div class="contact-grid">
+      <div class="win">
+        <div class="win-bar"><span class="title"><b>establish_connection.sh</b></span></div>
+        <div style="padding:26px 24px;">
+          <h2>Let's link up.</h2>
+          <p class="muted" style="margin:12px 0 20px; max-width:44ch;">Got a system that needs breaking before someone else does — or just want to talk shop? The channel's open.</p>
+          <a class="cta" href="https://www.instagram.com/john_valinsky/" target="_blank" rel="noopener noreferrer">
+            ▲ open secure channel
+          </a>
+          <p class="muted" style="font-family:var(--mono); font-size:11.5px; margin-top:18px;">// today's uptime bonus: it's his birthday 🎂</p>
+        </div>
+      </div>
+      <div class="contact-links">
+        <a class="clink" href="https://www.linkedin.com/in/john-lalremruata/" target="_blank" rel="noopener noreferrer">
+          <span class="ico">in</span>
+          <span><span class="lbl">LINKEDIN</span><br /><span class="val">/in/john-lalremruata</span></span>
+          <span class="go">↗</span>
+        </a>
+        <a class="clink" href="https://www.instagram.com/john_valinsky/" target="_blank" rel="noopener noreferrer">
+          <span class="ico">ig</span>
+          <span><span class="lbl">INSTAGRAM</span><br /><span class="val">@john_valinsky</span></span>
+          <span class="go">↗</span>
+        </a>
+        <div class="clink" style="cursor:default;">
+          <span class="ico">::</span>
+          <span><span class="lbl">ALIAS</span><br /><span class="val">Vøid</span></span>
+          <span class="go g">●</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="shell">
+  <span>© <span id="yr"></span> John Lalremruata · <span class="g">Vøid</span> // all systems nominal</span>
+  <span>built with terminal energy &amp; a birthday payload 🎂</span>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.getElementById("yr").textContent = new Date().getFullYear();
+
+  /* ---------- nav toggle ---------- */
+  var navToggle = document.getElementById("navToggle");
+  var navlinks = document.getElementById("navlinks");
+  navToggle.addEventListener("click", function () {
+    var open = navlinks.classList.toggle("open");
+    navToggle.setAttribute("aria-expanded", String(open));
+  });
+  navlinks.addEventListener("click", function (e) {
+    if (e.target.tagName === "A") { navlinks.classList.remove("open"); navToggle.setAttribute("aria-expanded", "false"); }
+  });
+
+  /* ---------- rotating role line ---------- */
+  var roles = [
+    "Cybersecurity & Red Team Operator",
+    "Penetration Tester",
+    "Offensive Security Specialist",
+    "Digital Creator",
+    "Breaker of things (professionally)"
+  ];
+  var roleEl = document.getElementById("role");
+  var ri = 0, rc = 0, deleting = false;
+  function typeRole() {
+    var full = roles[ri % roles.length];
+    rc += deleting ? -1 : 1;
+    roleEl.textContent = full.slice(0, rc);
+    if (!deleting && rc === full.length) { deleting = true; return setTimeout(typeRole, 1600); }
+    if (deleting && rc === 0) { deleting = false; ri++; return setTimeout(typeRole, 300); }
+    setTimeout(typeRole, deleting ? 34 : 66);
+  }
+  if (reduce) { roleEl.textContent = roles[0]; } else { roleEl.textContent = ""; setTimeout(typeRole, 700); }
+
+  /* ---------- arsenal ---------- */
+  var tools = ["Kali Linux","Burp Suite","Metasploit","Nmap","Wireshark","Python",
+    "Bash","Linux","John the Ripper","Hydra","Nikto","SQLmap","Git & GitHub","OSINT",
+    "Social Engineering","Reverse Engineering"];
+  var ag = document.getElementById("arsenal-grid");
+  ag.innerHTML = tools.map(function (t) {
+    return '<div class="tool"><span class="k" aria-hidden="true"></span>' + t + '</div>';
+  }).join("");
+
+  /* ---------- interactive terminal ---------- */
+  var input = document.getElementById("cmd");
+  var scroll = document.getElementById("scrollback");
+  function print(html) {
+    var p = document.createElement("p");
+    p.className = "line";
+    p.innerHTML = html;
+    scroll.appendChild(p);
+  }
+  function echo(cmd) {
+    print('<span class="prompt"><span class="u">john</span><span class="s">@</span><span class="p">void</span><span class="s">:~$</span></span> ' + escapeHtml(cmd));
+  }
+  function escapeHtml(s){ return s.replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  var commands = {
+    help: function () {
+      print('<span class="g">available commands:</span>');
+      print('  <span class="c">whoami</span>    → identity readout');
+      print('  <span class="c">skills</span>    → jump to the arsenal');
+      print('  <span class="c">ops</span>       → selected operations');
+      print('  <span class="c">focus</span>     → services offered');
+      print('  <span class="c">contact</span>   → open channels');
+      print('  <span class="c">social</span>    → linkedin / instagram');
+      print('  <span class="c">birthday</span>  → 🎂');
+      print('  <span class="c">sudo</span>      → try it');
+      print('  <span class="c">clear</span>     → wipe the scrollback');
+    },
+    whoami: function () {
+      print('<span class="a">john lalremruata</span> aka <span class="m">Vøid</span> — cybersecurity, red team, offensive security & digital creator.');
+    },
+    skills: function () { print('routing to ~/arsenal …'); go("#arsenal"); },
+    arsenal: function () { commands.skills(); },
+    ops: function () { print('opening ~/ops …'); go("#ops"); },
+    projects: function () { commands.ops(); },
+    focus: function () { print('listing services …'); go("#focus"); },
+    services: function () { commands.focus(); },
+    contact: function () { print('opening channels …'); go("#contact"); },
+    social: function () {
+      print('linkedin → <a href="https://www.linkedin.com/in/john-lalremruata/" target="_blank" rel="noopener">/in/john-lalremruata</a>');
+      print('instagram → <a href="https://www.instagram.com/john_valinsky/" target="_blank" rel="noopener">@john_valinsky</a>');
+    },
+    birthday: function () {
+      print('<span class="a">🎂 initiating birthday.exe …</span>');
+      print('<span class="g">HAPPY BIRTHDAY, JOHN!</span> may your exploits land and your coffee never run dry.');
+      fireConfetti();
+    },
+    sudo: function () {
+      print('<span class="red" style="color:var(--red)">[sudo] password for john:</span> nice try 😏 — you already have root here.');
+    },
+    ls: function () { print('about.md   arsenal/   ops/   services/   contact/   birthday.exe'); },
+    clear: function () { scroll.innerHTML = ""; }
+  };
+
+  function go(sel) {
+    var el = document.querySelector(sel);
+    if (el) el.scrollIntoView({ behavior: reduce ? "auto" : "smooth" });
+  }
+
+  input.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter") return;
+    var raw = input.value.trim();
+    input.value = "";
+    if (!raw) return;
+    echo(raw);
+    var name = raw.split(/\s+/)[0].toLowerCase();
+    if (commands[name]) { commands[name](); }
+    else { print('<span style="color:var(--red)">command not found:</span> ' + escapeHtml(name) + ' — type <span class="c">help</span>'); }
+    scroll.scrollTop = scroll.scrollHeight;
+    input.scrollIntoView({ block: "nearest" });
+  });
+
+  /* ---------- matrix rain ---------- */
+  if (!reduce) {
+    var mc = document.getElementById("matrix"), mx = mc.getContext("2d");
+    var cols, drops, glyphs = "01アイウエオカキクabcdef</>{}[]#$*".split(""), fs = 15;
+    function sizeM() {
+      mc.width = window.innerWidth; mc.height = window.innerHeight;
+      cols = Math.floor(mc.width / fs);
+      drops = new Array(cols).fill(0).map(function(){ return Math.random() * -50; });
+    }
+    sizeM();
+    window.addEventListener("resize", sizeM);
+    var last = 0;
+    function rain(t) {
+      requestAnimationFrame(rain);
+      if (t - last < 55) return; last = t;
+      mx.fillStyle = "rgba(7,11,16,0.14)";
+      mx.fillRect(0, 0, mc.width, mc.height);
+      mx.font = fs + "px monospace";
+      for (var i = 0; i < cols; i++) {
+        var ch = glyphs[Math.floor(Math.random() * glyphs.length)];
+        var x = i * fs, y = drops[i] * fs;
+        mx.fillStyle = Math.random() > 0.975 ? "#a9ffd6" : "#2fe08f";
+        mx.fillText(ch, x, y);
+        if (y > mc.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i]++;
+      }
+    }
+    requestAnimationFrame(rain);
+  }
+
+  /* ---------- confetti (birthday) ---------- */
+  var cc = document.getElementById("confetti"), cx = cc.getContext("2d"), parts = [], raf = null;
+  var palette = ["#ffb64d","#34f5a0","#46d8ff","#ff5db1","#ffd48a"];
+  function sizeC(){ cc.width = window.innerWidth; cc.height = window.innerHeight; }
+  sizeC(); window.addEventListener("resize", sizeC);
+  function fireConfetti() {
+    if (reduce) return;
+    for (var i = 0; i < 160; i++) {
+      parts.push({
+        x: cc.width / 2 + (Math.random()-0.5) * 160,
+        y: cc.height * 0.28,
+        vx: (Math.random()-0.5) * 13,
+        vy: Math.random() * -13 - 4,
+        s: 4 + Math.random()*6,
+        r: Math.random()*6.28,
+        vr: (Math.random()-0.5)*0.4,
+        c: palette[Math.floor(Math.random()*palette.length)],
+        life: 1
+      });
+    }
+    if (!raf) raf = requestAnimationFrame(stepC);
+  }
+  function stepC() {
+    cx.clearRect(0,0,cc.width,cc.height);
+    for (var i = parts.length-1; i>=0; i--) {
+      var p = parts[i];
+      p.vy += 0.32; p.x += p.vx; p.y += p.vy; p.vx *= 0.99; p.r += p.vr; p.life -= 0.008;
+      if (p.life <= 0 || p.y > cc.height + 30) { parts.splice(i,1); continue; }
+      cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r);
+      cx.globalAlpha = Math.max(0, p.life); cx.fillStyle = p.c;
+      cx.fillRect(-p.s/2, -p.s/2, p.s, p.s*0.5);
+      cx.restore();
+    }
+    if (parts.length) raf = requestAnimationFrame(stepC);
+    else { raf = null; cx.clearRect(0,0,cc.width,cc.height); }
+  }
+
+  /* auto-celebrate once on load */
+  window.addEventListener("load", function () { setTimeout(fireConfetti, 900); });
+})();
+</script>
